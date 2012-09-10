@@ -18,3 +18,12 @@ Status
 ------
 
 Pre-early-maybe-but-i'm-not-sure-alpha. Use at your own risk.
+
+Dependencies
+------------
+
+3g-hook needs 
+
+    eventemitter2 nssocket mdns
+
+to be installed either locally or globally. Future plans include a npm package. A user-wide installation is a good idea since mdns requires some compilation (just launch npm from your home folder).

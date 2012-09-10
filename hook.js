@@ -2,12 +2,16 @@ var EventEmitter = require('eventemitter2').EventEmitter2,
     nssocket = require('nssocket'),
     mdns = require('mdns'),
     util = require('util');
+
     
 // We try to generate a unique ID
 var generateGUID = function(){
     return (new String(Date.now())).substr(-5) 
       + (new String((Math.random()*1000)|0)).substr(-3); 
 }
+
+// Keeping track of active hooks in this process
+module.hooks = [];  
 
 // Main function
 var Hook = module.exports.Hook = function(options) {
@@ -75,6 +79,15 @@ var Hook = module.exports.Hook = function(options) {
             for (var i in data.types) {
                 self.peers[data.name].proxy.on(data.types[i], function(evdata){
                     var socket = new nssocket.NsSocket();
+                    
+                    // Some socket precautions
+                    socket.on('error', function(){
+                        socket.end();
+                    });
+                    socket.on('close', function(){
+                        // Forget about it
+                    });
+                    
                     socket.data('event::listening', function(){
                         socket.send('event::push', {
                             type: data.types[i],
@@ -163,7 +176,7 @@ Hook.prototype.start = function(){
                 return;
             }
             
-            // If we got here, the peer id good
+            // If we got here, the peer is good
             self.peers[data.name].socket = socket;
             self.peers[data.name].directPort = data.directPort;
             self.log('debug', 'Peer accepted');
@@ -218,14 +231,19 @@ Hook.prototype.start = function(){
     self.browser.on('serviceUp', function(service){
         // A new hook has come up
         
-        if (service.addresses.length === 0 && service.port === self.port) {
+        if (service.name === self.name) {
             // This means it's us and we do not want to self-connect
             return;
         }
             
-        // Some MDNS trickery while I figure out how it works
-        (service.addresses.length == 0) ? service.address = '127.0.0.1'
-          : service.address = service.addresses[0];   
+        // Badly configured machines have a tendency to tricks MDNS
+        // into returning services with no ip address.
+        if (service.addresses.length == 0) {
+            self.log('warn', 'MDNS returned no addresses for service ' 
+              + service.name + '; Maybe this can help: https://gist.github.com/3693599');
+            return;
+        } else
+            service.address = service.addresses[0];     
           
         self.log('debug', 'Peer up ' + service.address + ':' + service.port);
         
@@ -334,8 +352,10 @@ Hook.prototype.stop = function(){
     self.advertisement.stop();
     self.advertisement = undefined; 
     for (var k in self.peers) {
-        if (peers[k].isConnected)
+        if (self.peers[k].socket && self.peers[k].socket.connected)
             self.peers[k].socket.end();
+        if (self.peers[k].socket)
+            delete self.peers[k].socket; 
         delete self.peers[k];
     }
     self.server.end();
@@ -465,12 +485,25 @@ Hook.prototype.onConnectedPeer = function(peerName) {
     self.log('debug', 'Connection established  with peer ' + peer.name);   
 }
 
+
+// Stupid logging 101
+var logLevels = ['debug', 'debug', 'warn', 'err'];
+Hook.prototype.log = function(level, message) {
+    if (!message) 
+        return this.log('debug', level);
+    if (logLevels.indexOf(level) >= logLevels.indexOf(this.logLevel) || this.logLevel == 'all')
+        console.log(Date.now() 
+          + ' | ' + this.name + ' - ' + level.toUpperCase() + ' - ' + message);
+}
+
 // ==================================================================
 // Request/response emulation on store/sub p2p! What is this madness?
 // ==================================================================
+// 
+// Some useful req/res emulation from an old project.
 
 // We hereby declare to the world that we, indeed, respond to
-// a certain type of requests
+// a certain type of requests (as in app.get())
 Hook.prototype.respond = function(type, handler) {
  	var self = this;
 	var sender = type.split('::')[0];
@@ -528,17 +561,29 @@ Hook.prototype.stopResponding = function(type){
 	var sender = type.split('::')[0];
 	var evtype = type.split('::').slice(1).join('::');
 	var eventToUnsubFrom = sender + '::rrh_request::*::' 
-	  + this.name + '::' + evtype;
+	  + self.name + '::' + evtype;
 	self.removeAllListeners(eventToUnsubFrom);
 };
 
-
-// Stupid logging 101
-var logLevels = ['debug', 'debug', 'warn', 'err'];
-Hook.prototype.log = function(level, message) {
-    if (!message) 
-        return this.log('debug', level);
-    if (logLevels.indexOf(level) >= logLevels.indexOf(this.logLevel) || this.logLevel == 'all')
-        console.log(Date.now() 
-          + ' | ' + this.name + ' - ' + level.toUpperCase() + ' - ' + message);
+// Node-style creator function
+var createHook = module.exports.createHook = function(options){
+    var hook = new Hook(options);
+    module.hooks.push(hook);
+    return hook;
 }
+
+// This is something a serious programmer should never do
+process.on('uncaughtException', function (err) {
+    console.log("");
+    console.log("");
+    console.log('HORRENDOUS HAZARD!');
+    console.log('An exception bubbled all the way to the main loop.');
+    console.log('Here is the mess: ' + err);
+    console.log('I will now process to a uber reset.');
+    console.log("");
+    console.log("");
+    for (var i in module.hooks) {
+        module.hooks[i].stop();
+        module.hooks[i].start();     
+    }
+});
