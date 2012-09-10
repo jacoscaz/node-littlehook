@@ -58,9 +58,6 @@ var Hook = module.exports.Hook = function(options) {
     // IDs of [self.maxCache] most recently processed messages
     // so that we can skip a message we have already processed 
     self.sentCache = [];
-    
-    // Types of event we are subscribed to
-    self.types = [];
 
     // A peer is propagating the global status of its subscriptions.
     EventEmitter.prototype.on.call(self, 'p2p::hook::subscriptions', function(data){
@@ -118,6 +115,20 @@ Hook.prototype.connectedPeers = function(){
     for (var k in self.peers)
         if (self.peers[k].socket && self.peers[k].socket.connected)
             ar.push(self.peers[k]);
+    return ar;
+}
+
+// Extracts subscribed event types out of an EventEmitter2 instance
+var getEventTypes = function(eventEmitter) {
+    var ar = [];
+    var helper = function(node, delimiter, result, storage){        
+        for (var k in node)
+            if (k == '_listeners')
+                storage.push(result.split(delimiter).slice(1).join(delimiter));
+            else if (typeof(node[k]) == 'object' && !Array.isArray(node[k]))
+                helper(node[k], delimiter, result + delimiter + k, storage);
+    }
+    helper(eventEmitter.listenerTree, eventEmitter.delimiter, '', ar);
     return ar;
 }
 
@@ -283,7 +294,7 @@ Hook.prototype.start = function(){
         function(){
             self.log('debug', 'Propagating subscriptions...');
             self.propagate('hook::subscriptions', {
-                types: self.types,
+                types: getEventTypes(self),
                 name: self.name,
                 directPort: self.directPort
             });
@@ -335,9 +346,6 @@ Hook.prototype.on = function(type, handler) {
     
     // Because I value!
     EventEmitter.prototype.on.call(this, type, handler);
-    
-    // Dirty trick while I figure out EventEmitter2 inner workings
-    self.types.push(type);
     
     self.log('debug', 'Subscribed to ' + type);
 }
