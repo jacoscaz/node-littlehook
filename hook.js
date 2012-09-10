@@ -8,13 +8,10 @@ var EventEmitter = require('eventemitter2').EventEmitter2,
 var generateGUID = function(){
     return (new String(Date.now())).substr(-5) 
       + (new String((Math.random()*1000)|0)).substr(-3); 
-}
-
-// Keeping track of active hooks in this process
-module.hooks = [];  
+}  
 
 // Main function
-var Hook = module.exports.Hook = function(options) {
+var Hook = function(options) {
 
     var self = this;
     
@@ -366,9 +363,9 @@ Hook.prototype.stop = function(){
             delete self.peers[k].socket; 
         delete self.peers[k];
     }
-    self.server.end();
+    self.server.close();
     self.server = undefined;
-    self.directServer.end();
+    self.directServer.close();
     self.directServer = undefined;
 }
 
@@ -575,23 +572,5 @@ Hook.prototype.stopResponding = function(type){
 
 // Node-style creator function
 var createHook = module.exports.createHook = function(options){
-    var hook = new Hook(options);
-    module.hooks.push(hook);
-    return hook;
+    return new Hook(options);
 }
-
-// This is something a serious programmer should never do
-process.on('uncaughtException', function (err) {
-    console.log("");
-    console.log("");
-    console.log('HORRENDOUS HAZARD!');
-    console.log('An exception bubbled all the way to the main loop.');
-    console.log('Here is the mess: ' + err);
-    console.log('I will now process to a uber reset.');
-    console.log("");
-    console.log("");
-    for (var i in module.hooks) {
-        module.hooks[i].stop();
-        module.hooks[i].start();     
-    }
-});

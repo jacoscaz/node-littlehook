@@ -1,6 +1,6 @@
-var Hook = require('./hook.js').Hook;
+var createHook = require('./hook.js').createHook;
 
-var h1 = new Hook({port: 4241, directPort: 4242});
+var h1 = createHook({port: 4241, directPort: 4242});
 
 h1.start();
 
