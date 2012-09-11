@@ -59,3 +59,21 @@ API
 ---
 
 Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api).
+
+Each Hook emits the following events:
+
+    +-------------------------------+----------------+--------------------------------------+
+    |  Event type                   |  Data          |  Meaning                             |
+    +-------------------------------+----------------+--------------------------------------+
+    |[peerName]::hook::up           |Peer object     |A new peer came online                |
+    +-------------------------------+----------------+--------------------------------------+
+    |[peerName]::hook::down         |Peer object     |A known peer went offline             |
+    +-------------------------------+----------------+--------------------------------------+
+    |[peerName]::hook::update       |Peer object     |A known peer has been update          |
+    +-------------------------------+----------------+--------------------------------------+
+    |[peerName]::hook::subscribed   |Event type      |A known peer has subscribed to        |
+    +-------------------------------+----------------+--------------------------------------+
+    |[peerName]::hook::unsubscribed |Event type      |A known peer had unsubscribed from    |
+    +-------------------------------+----------------+--------------------------------------+ 
+    |[peerName]::p2p::connected     |NsSocket object |New connection established with peer  |
+    +-------------------------------+----------------+--------------------------------------+

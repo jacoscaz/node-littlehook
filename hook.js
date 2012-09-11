@@ -172,11 +172,15 @@ Hook.prototype.start = function(){
             self.log('log', 'Connected to ' 
               + Object.keys(self.connectedPeers()).length + ' peers');
             for (var k in self.peers)
-                if ((Date.now() - self.peers[k].lastHeard) > 60000)
+                if ((Date.now() - self.peers[k].lastHeard) > 60000) {
+                    EventEmitter.prototype.emit.call(self, k + '::hook::down', self.peers[k])
                     delete self.peers[k];
+                }
         }, 
         self.connectionMonitorIntervalMillis
     );
+    
+    EventEmitter.prototype.emit.call(self, self.name + '::hook::up', self);
 }
 
 // This we use to emit stuff on the network
@@ -191,16 +195,10 @@ Hook.prototype.emit = function(type, data) {
     }
 }
 
-// This we use to subscribe to stuff from the network
-Hook.prototype.on = function(type, handler) {
-    var self = this;
-    EventEmitter.prototype.on.call(self, type, handler);
-    self.log('log', 'Subscribed to ' + type);
-}
-
 // Well, no real need to explain this.
 Hook.prototype.stop = function(){
     var self = this;
+    EventEmitter.prototype.emit.call(self, self.name + '::hook::down', self);
     clearInterval(self.propagationInterval);
     clearInterval(self.connectionMonitorInterval);
     self.browser.stop();
@@ -299,6 +297,7 @@ Hook.prototype.propagate = function(type, data) {
 
 Hook.prototype.onHookInfo = function(data){
     var self = this;
+    var newPeer = false;
     if (!self.peers[data.name]) {
         self.peers[data.name] = {
             name: data.name,
@@ -309,41 +308,53 @@ Hook.prototype.onHookInfo = function(data){
             })
         };
         self.peers[data.name].proxy.getEventTypes = function(){
-            return self.prototype.getEventTypes.call(self.peers[data.name].proxy);
+            return self.getEventTypes.call(self.peers[data.name].proxy);
         }
+        newPeer = true;
     }
     self.peers[data.name].port = data.port;
     self.peers[data.name].directPort = data.directPort;
     self.peers[data.name].host = data.host;
     self.peers[data.name].name = data.name;
     self.peers[data.name].lastHeard = Date.now();
-    // Hard reset of EventEmitter2 .listenerTree object
-    // Need to find a better way to do this, maybe exchanging
-    // the trees and diff'ing them or something like that.
-    self.peers[data.name].proxy.listenerTree = {};
+    
+    if (newPeer) EventEmitter.prototype.emit.call(self, data.name + '::hook::up', self.peers[data.name]);
+    EventEmitter.prototype.emit.call(self, data.name + '::hook::update', self.peers[data.name]);
+    
+    var oldTypes = self.peers[data.name].proxy.getEventTypes();
+    
     // To-Do: the listener function is always the same!
     // Find a way to circumvent duplication
     for (var i in data.types) {
-        self.peers[data.name].proxy.on(data.types[i], function(evdata){
-            var socket = new nssocket.NsSocket();
-            socket.on('error', function(){socket.end();});
-            socket.on('close', function(){/* Forget about it */});
-            socket.data('event::listening', function(){
-                socket.send('event::push', {
-                    type: data.types[i],
-                    data: evdata,
-                    name: self.name
+        if (oldTypes.indexOf(data.types[i]) == -1) {
+            self.peers[data.name].proxy.on(data.types[i], function(evdata){
+                var socket = new nssocket.NsSocket();
+                socket.on('error', function(){socket.end();});
+                socket.on('close', function(){/* Forget about it */});
+                socket.data('event::listening', function(){
+                    socket.send('event::push', {
+                        type: data.types[i],
+                        data: evdata,
+                        name: self.name
+                    });
+                    socket.end();
+                    self.log('debug', 'Message sent');
                 });
-                socket.end();
-                self.log('debug', 'Message sent');
+                self.log('debug', 'Sending direct message to peer ' + data.name);
+                try {
+                    socket.connect(self.peers[data.name].directPort, self.peers[data.name].host);
+                } catch (err) {
+                    self.log('warn', 'Could not send messsage to peer ' + data.name);
+                }
             });
-            self.log('debug', 'Sending direct message to peer ' + data.name);
-            try {
-                socket.connect(self.peers[data.name].directPort, self.peers[data.name].host);
-            } catch (err) {
-                self.log('warn', 'Could not send messsage to peer ' + data.name);
-            }
-        });
+            EventEmitter.prototype.emit.call(self, data.name + '::hook::subscribed', data.types[i]);
+        }
+    }
+    for (var i in oldTypes) {
+        if (data.types.indexOf(oldTypes[i]) == -1) {
+            self.peers[data.name].proxy.removeAllListeners(oldTypes[i]);
+            EventEmitter.prototype.emit.call(self, data.name + '::hook::unsubscribed', oldTypes[i]);
+        }
     }
     self.log('log', 'Info for peer ' + data.name + ' updated');
 }
@@ -383,6 +394,7 @@ Hook.prototype.onConnectedPeer = function(peerName) {
             }
         });
         self.log('log', 'Connection established  with peer ' + peerName);
+        EventEmitter.prototype.emit.call(self, peerName + '::p2p::connected', self.sockets[peerName]);
     }   
 }
 
