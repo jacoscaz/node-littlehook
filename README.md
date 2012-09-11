@@ -69,11 +69,11 @@ Each Hook emits the following events:
     +-------------------------------+----------------+--------------------------------------+
     |[peerName]::hook::down         |Peer object     |A known peer went offline             |
     +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::update       |Peer object     |A known peer has been update          |
+    |[peerName]::hook::update       |Peer object     |A known peer has been updated         |
     +-------------------------------+----------------+--------------------------------------+
     |[peerName]::hook::subscribed   |Event type      |A known peer has subscribed to        |
     +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::unsubscribed |Event type      |A known peer had unsubscribed from    |
+    |[peerName]::hook::unsubscribed |Event type      |A known peer has unsubscribed from    |
     +-------------------------------+----------------+--------------------------------------+ 
     |[peerName]::p2p::connected     |NsSocket object |New connection established with peer  |
     +-------------------------------+----------------+--------------------------------------+
