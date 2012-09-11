@@ -53,6 +53,15 @@ Usage
     var hook = 3phook.createHook({
     	name: 'someHook'             // The hook's name
     });
+    
+    hook.on('*::some::event', function(data){
+    	// Do something
+    });
+    
+    hook.emit('some::other::event', 'event data');
+    
+    hook.respond
+    
     hook.start();
 
 API
@@ -60,20 +69,42 @@ API
 
 Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api).
 
+In addition, each hook provides the following request-response methods:
+
+    hook.respond('request::type', handler(requestData, reply){
+    	var requestEvent = this.event;
+        reply('response::type', 'response data');
+    })
+
+    hook.request(
+        'request::type', 
+        'request data',
+        eachResponse(responseData){
+        	var responseEvent = this.event;
+            // Do smthg
+        },
+        1000,
+        afterTimeout(){
+        	// Do smthg
+        }
+    );
+
+    hook.stopResponding('request::type');
+
 Each Hook emits the following events:
 
-    +-------------------------------+----------------+--------------------------------------+
-    |  Event type                   |  Data          |  Meaning                             |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::up           |Peer object     |A new peer came online                |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::down         |Peer object     |A known peer went offline             |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::update       |Peer object     |A known peer has been update          |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::subscribed   |Event type      |A known peer has subscribed to        |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::unsubscribed |Event type      |A known peer had unsubscribed from    |
-    +-------------------------------+----------------+--------------------------------------+ 
-    |[peerName]::p2p::connected     |NsSocket object |New connection established with peer  |
-    +-------------------------------+----------------+--------------------------------------+
+    +------------------------------------+-----------------+--------------------------------------+
+    |  Event type                        |  Data           |  Meaning                             |
+    +------------------------------------+-----------------+--------------------------------------+
+    |[peerName]::p2p::hook::up           |Peer object      |A new peer came online                |
+    +------------------------------------+-----------------+--------------------------------------+
+    |[peerName]::p2p::hook::down         |Peer object      |A known peer went offline             |
+    +------------------------------------+-----------------+--------------------------------------+
+    |[peerName]::p2p::hook::update       |Update object    |A known peer has sent an update       |
+    +------------------------------------+-----------------+--------------------------------------+
+    |[peerName]::p2p::hook::newListener  |Event type       |A known peer has subscribed to        |
+    +-----------------------------------+------------------+--------------------------------------+
+    |[peerName]::p2p::hook::noListeners  |Event type       |A known peer has unsubscribed from    |
+    +------------------------------------+-----------------+--------------------------------------+ 
+    |[peerName]::p2p::hook::connected    |NsSocket object  |New connection established with peer  |
+    +------------------------------------+----------------+--------------------------------------+
