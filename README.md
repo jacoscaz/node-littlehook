@@ -46,26 +46,13 @@ And the actual package
 
     npm install 3p-hook
 
-Usage
------
+Usage & API
+-----------
 
-    var 3phook = require('path/to/the/module/hook.js'); 
+    var 3phook = require('3p-hook'); 
     var hook = 3phook.createHook({
     	name: 'someHook'             // The hook's name
     });
-    
-    hook.on('*::some::event', function(data){
-    	// Do something
-    });
-    
-    hook.emit('some::other::event', 'event data');
-    
-    hook.respond
-    
-    hook.start();
-
-API
----
 
 Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api).
 
@@ -93,7 +80,6 @@ In addition, each hook provides the following request-response methods:
 
 Each Hook emits the following events:
 
-<<<<<<< HEAD
     +------------------------------------+-----------------+--------------------------------------+
     |  Event type                        |  Data           |  Meaning                             |
     +------------------------------------+-----------------+--------------------------------------+
@@ -108,21 +94,4 @@ Each Hook emits the following events:
     |[peerName]::p2p::hook::noListeners  |Event type       |A known peer has unsubscribed from    |
     +------------------------------------+-----------------+--------------------------------------+ 
     |[peerName]::p2p::hook::connected    |NsSocket object  |New connection established with peer  |
-    +------------------------------------+----------------+--------------------------------------+
-=======
-    +-------------------------------+----------------+--------------------------------------+
-    |  Event type                   |  Data          |  Meaning                             |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::up           |Peer object     |A new peer came online                |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::down         |Peer object     |A known peer went offline             |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::update       |Peer object     |A known peer has been updated         |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::subscribed   |Event type      |A known peer has subscribed to        |
-    +-------------------------------+----------------+--------------------------------------+
-    |[peerName]::hook::unsubscribed |Event type      |A known peer has unsubscribed from    |
-    +-------------------------------+----------------+--------------------------------------+ 
-    |[peerName]::p2p::connected     |NsSocket object |New connection established with peer  |
-    +-------------------------------+----------------+--------------------------------------+
->>>>>>> 64258d74d19686102234b717fac8342ceafeeaef
+    +------------------------------------+-----------------+--------------------------------------+
