@@ -6,7 +6,7 @@
 What does it do
 ---------------
 
-3p-hook provides lightweight, name-based, namespaced and fully-decentralized eventing similar to [Hook.io](https://github.com/hookio/hook.io) and its lightweight cousin [Tinyhook](https://github.com/sergeyksv/tinyhook) but in a "(pure p2p)[http://en.wikipedia.org/wiki/Peer-to-peer#Unstructured_systems]" fashion. Each hook independently takes care of discoverying other hooks, mantaining connections, pushing events to the right listeners (no meshes, no trees) and can safely fail without compromising the rest of its peers or the network. A request-response emulation layer is also provided for name-based http-like interactions.
+3p-hook provides lightweight, name-based, namespaced and fully-decentralized eventing similar to [Hook.io](https://github.com/hookio/hook.io) and its lightweight cousin [Tinyhook](https://github.com/sergeyksv/tinyhook) but in a "[pure p2p](http://en.wikipedia.org/wiki/Peer-to-peer#Unstructured_systems)" fashion. Each hook independently takes care of discoverying other hooks, mantaining connections, pushing events to the right listeners (no meshes, no trees) and can safely fail without compromising the rest of its peers or the network. A request-response emulation layer is also provided for name-based http-like interactions.
 
 How does it work
 ----------------
