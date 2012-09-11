@@ -42,9 +42,9 @@ Dependencies (better do this from your home directory):
     npm install nssocket
     npm install mdns
 
-A package for NPM is in the works but not ready yet. Clone this repo: 
+And the actual package 
 
-    git clone git://github.com/jacoscaz/3p-hook.git
+    npm install 3p-hook
 
 Usage
 -----

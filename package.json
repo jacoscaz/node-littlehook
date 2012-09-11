@@ -1,0 +1,19 @@
+{
+    "name": "3p-hook",
+    "version": "0.0.1",
+    "description": "A pure P2P lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
+    "main": "./hook.js",
+    "author": "Jacopo Scazzosi <jacoposcazzosi@gmail.com>",
+    "keywords": ["auto", "discovery", "decentralized", "p2p", "eventemitter", "pure"],
+    "repository" : {
+        "type": "git",
+        "url": "https://github.com/jacoscaz/3p-hook"
+    },
+    "dependencies": {
+    	"eventemitter2": "0.4.x",
+    	"nssocket": "0.3.x",
+    	"mdns": "0.0.7"
+    },
+    "license": "MIT",
+    "engines": {"node": ">=0.6"}
+}
