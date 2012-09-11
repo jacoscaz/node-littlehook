@@ -5,225 +5,112 @@ var EventEmitter = require('eventemitter2').EventEmitter2,
 
     
 // We try to generate a unique ID
-var generateGUID = function(){
+var generateID = function(){
     return (new String(Date.now())).substr(-5) 
       + (new String((Math.random()*1000)|0)).substr(-3); 
 }  
 
 // Main function
 var Hook = function(options) {
-
     var self = this;
-    
     // We call the superconstructor on ourselves
     EventEmitter.call(self, {
         delimiter: "::",
         wildcard: true,
         maxListeners: 20
     });
-    
-    // Ah, the creator
-    self.constructor = Hook;
-    
-    // Our name as a hook
-    self.name = options['name'] || 'h' + generateGUID();
-    
-    // Our listening port for p2p connections
-    self.port = options['port'] || 4242;
-    
-    // Our listening port for direct connections
+    self.constructor = Hook;                                
+    self.name = options['name'] || 'h' + generateID();      
+    self.port = options['port'] || 4242;                    
     self.directPort = options['directPort'] || self.port + 10;
-    
-    // p2p message cache size
     self.maxCache = options['maxCache'] || 20;
-    
-    // Maximum connected peers
     self.maxPeers = options['maxPeers'] || 3;
-    
-    // Frequency of monitoring our connections
     self.connectionMonitorIntervalMillis = options['connectionMonitorInterval'] * 1000 || 5000; // Seconds!
-    
-    // Frequency & interval of propagation for our subscriptions
-    self.propagationIntervalMillis = options['propagationInterval'] * 1000 || 5000; // Seconds!
-    
-    // Desired logging level (none, err, warn, log, debug, all)
-    self.logLevel = options['logLevel'] || 'debug';
-    
-    // Our peers indexed by their names (-> unique id)
+    self.propagationIntervalMillis = options['propagationInterval'] * 1000 || 10000; // Seconds!
+    self.logLevel = options['logLevel'] || 'log';
+    self.mdnsPeers = {};
     self.peers = {};
-    
-    // IDs of [self.maxCache] most recently processed messages
-    // so that we can skip a message we have already processed 
+    self.sockets = {}; 
     self.sentCache = [];
-
-    // A peer is propagating the global status of its subscriptions.
-    EventEmitter.prototype.on.call(self, 'p2p::hook::subscriptions', function(data){
-        if (self.peers[data.name]) {
-        
-            // Hard reset of EventEmitter2 .listenerTree object
-            // Need to find a better way to do this, maybe exchanging
-            // the trees and diff'ing them or something like that.
-            self.peers[data.name].proxy.listenerTree = {};
-            
-            // Port update
-            self.peers[data.name].directPort = data.directPort;
-            
-            // To-Do: the listener function is always the same!
-            // Find a way to circumvent duplication
-            for (var i in data.types) {
-                self.peers[data.name].proxy.on(data.types[i], function(evdata){
-                    var socket = new nssocket.NsSocket();
-                    
-                    // Some socket precautions
-                    socket.on('error', function(){
-                        socket.end();
-                    });
-                    socket.on('close', function(){
-                        // Forget about it
-                    });
-                    
-                    socket.data('event::listening', function(){
-                        socket.send('event::push', {
-                            type: data.types[i],
-                            data: evdata
-                        });
-                        socket.end();
-                        self.log('debug', 'Message sent');
-                    });
-                    self.log('debug', 'Sending direct message to peer ' + data.name);
-                    socket.connect(self.peers[data.name].directPort, self.peers[data.name].host);
-                });
-            }
-            
-            self.log('debug', 'Subscriptions for peer ' + data.name + ' updated');
-        }
+    
+    EventEmitter.prototype.on.call(self, '*::hook::info', function(data){
+        if (this.event.split('::')[0] != data.name)
+            self.log('warn', 'Name mismatch in hook info, ignoring...');
+        else
+            self.onHookInfo(data);
     });
-
 }
 
 // Inheritance stuff
 Hook.prototype = Object.create(EventEmitter.prototype);
 Hook.prototype.constructor = EventEmitter;
 
-// Return the array of connected peers
+// Node-style creator function
+var createHook = module.exports.createHook = function(options){
+    return new Hook(options);
+}
+
+// Returns array of connected sockets
 Hook.prototype.connectedPeers = function(){
     var self = this;
-    var ar = [];
-    for (var k in self.peers)
-        if (self.peers[k].socket && self.peers[k].socket.connected)
-            ar.push(self.peers[k]);
+    var ar = {};
+    for (var k in self.sockets)
+        if (self.sockets[k].connected)
+            ar[k] = self.sockets[k];
     return ar;
 }
 
-// Extracts subscribed event types out of an EventEmitter2 instance
-var getEventTypes = function(eventEmitter) {
+// Extracts event types out of an EventEmitter2 instance
+Hook.prototype.getEventTypes = function() {
+    var self = this;
     var ar = [];
     var helper = function(node, delimiter, result, storage){        
         for (var k in node)
-            if (k == '_listeners')
+            if (k == '_listeners') {
                 storage.push(result.split(delimiter).slice(1).join(delimiter));
-            else if (typeof(node[k]) == 'object' && !Array.isArray(node[k]))
+            } else if (typeof(node[k]) == 'object' && !Array.isArray(node[k])) {
                 helper(node[k], delimiter, result + delimiter + k, storage);
+            } else {/* We should never end up here */}
     }
-    helper(eventEmitter.listenerTree, eventEmitter.delimiter, '', ar);
+    helper(self.listenerTree, self.delimiter, '', ar);
     return ar;
 }
 
 // Instance initialization
 Hook.prototype.start = function(){
-
     var self = this;
-    
     self.log('debug', 'Starting...');
 
     // Server (listening) socket for p2p connections
     self.server = nssocket.createServer(function(socket){
-    
-        if (self.connectedPeers().length >= self.maxPeers) {
-            // Too many peers connected
-            self.log('debug', 'Too many connections');
-            socket.end();
-            return;
-        }
-        
-        var timeout = setTimeout(
-            function(){
-                // Peer is not answering
-                self.log('debug', 'No answer'); 
-                socket.end();
-            }, 
-            3000
-        );
-        
+        var timeout = setTimeout(function(){socket.end();}, 3000);
         socket.data('ident::response', function(data){
-            // The peer answered with its identification
-            
-            clearTimeout(timeout); // We can clear the timeout
-            
             self.log('debug', 'Peer name: ' + data.name);
-            
-            if (self.name == data.name) {
-                // Trying to self-connect!
-                self.log('debug', 'Self-connect attempt');
-                socket.end();
-                return;
+            if ((self.name == data.name) || (self.sockets[data.name] 
+                  && self.sockets[data.name].connected)) {
+                socket.send('ident::refused');
+            } else {
+                clearTimeout(timeout);
+                self.sockets[data.name] = socket;
+                self.log('debug', 'Peer accepted');
+                self.onConnectedPeer(data.name);
+                socket.send('ident::ok');
             }
-            
-            if (!self.peers[data.name]){
-                // Peer is not advertised
-                self.log('debug', 'Unknown peer');
-                socket.end();
-                return;
-            } 
-            
-            if (self.peers[data.name].socket 
-              && self.peers[data.name].socket.connected) {
-                // We are already connected to this peer
-                self.log('debug', 'Already connected');
-                socket.end();
-                return;
-            }
-            
-            // If we got here, the peer is good
-            self.peers[data.name].socket = socket;
-            self.peers[data.name].directPort = data.directPort;
-            self.log('debug', 'Peer accepted');
-            
-            // See...
-            self.onConnectedPeer(data.name);
-            
-            // Send confirmation to peer
-            socket.send('ident::ok');
         }); 
-        
-        // Ask peer for identification
-        socket.send('ident::request');
+        socket.send('ident::request', {name: self.name});
         self.log('debug', 'Incoming connection');
     });
     self.server.listen(self.port);
     
     // Server (listening) socket for direct connections
     self.directServer = nssocket.createServer(function(socket){
-        
-        var timeout = setTimeout(function(){
-            self.log('debug', 'No answer');
-            // If we get here, client is not answering
-            socket.end();
-        }, 1000);
-        
+        var timeout = setTimeout(function(){socket.end();}, 1000);
         socket.data('event::push', function(data){
-            // Client answered with the event to be emitter locally
-            
-            // We can clear the timeout and shutdown the socket
             clearTimeout(timeout);
             socket.end(); // Future connections might require the removal of this line
-
-            // Emit the event locally
-            self.log('debug', 'Direct message received');
+            self.log('log', 'Direct message received from peer ' + data.name);
             EventEmitter.prototype.emit.call(self, data.type, data.data);
         });
-        
-        // We are ready to receive the event
         socket.send('event::listening');
         self.log('debug', 'Direct connection');
     });
@@ -237,50 +124,26 @@ Hook.prototype.start = function(){
     // MDNS Browser         
     self.browser = mdns.createBrowser(mdns.tcp('hook'));
     self.browser.on('serviceUp', function(service){
-        // A new hook has come up
-        
-        if (service.name === self.name) {
-            // This means it's us and we do not want to self-connect
-            return;
-        }
-            
-        // Badly configured machines have a tendency to tricks MDNS
-        // into returning services with no ip address.
-        if (service.addresses.length == 0) {
-            self.log('warn', 'MDNS returned no addresses for service ' 
-              + service.name + '; Maybe this can help: https://gist.github.com/3693599');
-            return;
-        } else
-            service.address = service.addresses[0];     
-          
-        self.log('debug', 'Peer up ' + service.address + ':' + service.port);
-        
-        // If we do not have this peer on our list, we store its info
-        // and create the proxy  
-        if (!self.peers[service.name]) {
-            self.peers[service.name] = {
-                name: service.name,
-                host: service.address,
-                port: service.port,
-                types: [],
-                proxy: new EventEmitter({
-                    delimiter: "::",
-                    wildcard: true,
-                    maxListeners: 20
-                })
-            };
+        if (service.name != self.name) {
+            if (service.addresses.length == 0) {
+                self.log('warn', 'MDNS returned no addresses for service ' 
+                  + service.name + '; Maybe this can help: https://gist.github.com/3693599');
+            } else {
+                  // To-Do: better way to select the address
+                service.address = service.addresses[0];     
+                self.log('log', 'MDNS: peer up ' + service.name);  
+                self.mdnsPeers[service.name] = {
+                    name: service.name,
+                    host: service.address,
+                    port: service.port,
+                };
+            }            
         }
     });
     
-    
     self.browser.on('serviceDown', function(service){
-        // Oh noes, a hook went down!
-        // We shall remove it from our list and close sockets.
-        if (self.peers[service.name] 
-          && self.peers[service.name].socket 
-          && self.peers[service.name].socket.connected)
-            self.peers[service.name].socket.end();
-        delete self.peers[service.name];
+        delete self.mdnsPeers[service.name];
+        self.log('log', 'MDNS: peer down ' + service.name);
     });
     
     self.browser.start();
@@ -289,12 +152,8 @@ Hook.prototype.start = function(){
     // can send us things we like!
     self.propagationInterval = setInterval(
         function(){
-            self.log('debug', 'Propagating subscriptions...');
-            self.propagate('hook::subscriptions', {
-                types: getEventTypes(self),
-                name: self.name,
-                directPort: self.directPort
-            });
+            self.log('debug', 'Propagating info...');
+            self.propagateInfo();
         }, 
         self.propagationIntervalMillis
     );
@@ -303,34 +162,29 @@ Hook.prototype.start = function(){
     // other peers all the time
     self.connectionMonitorInterval = setInterval(
         function(){
-            if (self.connectedPeers().length < self.maxPeers 
-              && Object.keys(self.peers).length > 0
-              && self.connectedPeers().length < Object.keys(self.peers).length) {
-                var name = Object.keys(self.peers)[(Math.random()*Object.keys(self.peers).length)|0];
+            if (Object.keys(self.connectedPeers()).length < self.maxPeers 
+              && Object.keys(self.mdnsPeers).length > 0
+              && Object.keys(self.connectedPeers()).length < Object.keys(self.mdnsPeers).length) {
+                var name = Object.keys(self.mdnsPeers)[(Math.random()*Object.keys(self.mdnsPeers).length)|0];
                 self.log('debug', 'Connection attempt with peer ' + name);
-                self.connect(name);
+                self.connect(self.mdnsPeers[name].port, self.mdnsPeers[name].host);
             }
-            self.log('debug', 'Connected to ' 
-              + self.connectedPeers().length + ' peers');
+            self.log('log', 'Connected to ' 
+              + Object.keys(self.connectedPeers()).length + ' peers');
+            for (var k in self.peers)
+                if ((Date.now() - self.peers[k].lastHeard) > 60000)
+                    delete self.peers[k];
         }, 
         self.connectionMonitorIntervalMillis
     );
-    
-    // Init is finished, hooray! Let's fire the 'hook::ready' event
-    // for compatibility purposes 
-    EventEmitter.prototype.emit.call(self, 'hook::ready');
 }
 
 // This we use to emit stuff on the network
 Hook.prototype.emit = function(type, data) {
     var self = this;
-    
     self.log('debug', 'Emitting event');
-    
-    // We emit events by calling to other hooks' proxies
-    // They take care of checking subscriptions and blabla
+    type = self.name + '::' + type;
     EventEmitter.prototype.emit.call(self, type, data);
-    type = self.name + '::' + type; // Named events as in hook.io
     for (var k in self.peers) {
         self.peers[k].proxy.emit(type, data);
         self.log('debug', 'Emitted for peer ' + k);
@@ -340,11 +194,8 @@ Hook.prototype.emit = function(type, data) {
 // This we use to subscribe to stuff from the network
 Hook.prototype.on = function(type, handler) {
     var self = this;
-    
-    // Because I value!
-    EventEmitter.prototype.on.call(this, type, handler);
-    
-    self.log('debug', 'Subscribed to ' + type);
+    EventEmitter.prototype.on.call(self, type, handler);
+    self.log('log', 'Subscribed to ' + type);
 }
 
 // Well, no real need to explain this.
@@ -356,12 +207,10 @@ Hook.prototype.stop = function(){
     self.browser = undefined;
     self.advertisement.stop();
     self.advertisement = undefined; 
-    for (var k in self.peers) {
-        if (self.peers[k].socket && self.peers[k].socket.connected)
-            self.peers[k].socket.end();
-        if (self.peers[k].socket)
-            delete self.peers[k].socket; 
-        delete self.peers[k];
+    for (var k in self.sockets) {
+        if (self.sockets[k].connected)
+            self.sockets[k].end(); 
+        delete self.sockets[k];
     }
     self.server.close();
     self.server = undefined;
@@ -370,132 +219,179 @@ Hook.prototype.stop = function(){
 }
 
 // Here we initiate a connection with another peer from the client side
-Hook.prototype.connect = function(peerName){
+Hook.prototype.connect = function(port, host){
     var self = this;
-    
     self.log('debug', 'Connection attempt with peer ' + peerName);
-    
-    if (!self.peers[peerName]) {
-        // A client must have been detected by MDNS before we can
-        // connect to it
-        self.log('debug', 'Can\'t connect with unlisted peer');
-        return;
-    }
-    
-    var peer = self.peers[peerName];
-    
-    if (peer.socket && peer.socket.connected) {
-        // Already connected to this client (or maybe the client called
-        // us first)
-        self.log('debug', 'Already connected');
-        return;        
-    }
-    
-    // Instantiate the socket
     var socket = new nssocket.NsSocket();
-    
-    // Await for the server to ask us who the heck are we
-    socket.data('ident::request', function(){
-        // We respond with our name
-        socket.send('ident::response', {
-            name: self.name
-        });
-        self.log('debug', 'Identification sent');
+    var timeout = setTimeout(function(){socket.end();}, 3000);
+    var peerName;
+    socket.data('ident::request', function(data){
+        peerName = data.name;
+        if (!self.sockets[peerName]) {
+            socket.send('ident::response', {name: self.name});
+            self.log('debug', 'Identification sent');
+        } else {
+            socket.end();
+        }
     });
-    
+    socket.data('ident::refused', function(){
+        socket.end(); 
+        clearTimeout(timeout);
+    });
     socket.data('ident::ok', function(data){
-        // Nice, the server accepted our connection request
-        peer.socket = socket;
-        // We can proceed
-        self.onConnectedPeer(peer.name);
+        clearTimeout(timeout);
+        self.sockets[peerName] = socket;
+        self.onConnectedPeer(peerName);
     });
-    
-    socket.connect(peer.port, peer.host);
+    socket.connect(port, host);
+}
+
+// Send out our info via p2p to everybody else
+Hook.prototype.propagateInfo = function() {
+    var self = this;
+    self.propagate('hook::info', {
+        port: self.port,
+        directPort: self.directPort,
+        host: '{{localAddress}}',
+        types: self.getEventTypes(),
+        name: self.name 
+    });
 }
 
 Hook.prototype.propagate = function(type, data) {
     var self = this;
-    
     self.log('debug', 'Propagating event...');
-    
     // Create a message id so that we can track loops
     var msgId = self.name + (new String(Date.now())).substr(-7)
       + (new String((Math.random()*1000)|0)).substr(-7);
-      
-    // Send message to all conected peers
-    for (var k in self.peers) {
-        if (self.peers[k].socket && self.peers[k].socket.connected) {
-            self.peers[k].socket.send('message::forward', {
-                type: type,
+    // Send message to all connected peers
+    for (var k in self.sockets)
+        if (self.sockets[k].connected) {
+            var fillAddresses = function(node) {
+                for (var j in node) {
+                    if (typeof(node[j]) == 'string') {
+                        if (node[j] == '{{localAddress}}')
+                            node[j] = self.sockets[k].socket.address().address;
+                        if (node[j] == '{{remoteAddress}}')
+                            node[j] = self.sockets[k].socket.remoteAddress;
+                        if (node[j] == '{{localPort}}')
+                            node[j] = self.sockets[k].socket.address().port;
+                        if (node[j] == '{{remotePort}}')
+                            node[j] = self.sockets[k].socket.remotePort; 
+                    } 
+                    if (typeof(node[j]) == 'object'){
+                        fillAddresses(node[j]);
+                    }
+                }
+            }
+            fillAddresses(data);
+            self.sockets[k].send('message::forward', {
+                type: self.name + '::' + type,
                 data: data,
                 msgId: msgId 
             });
             self.log('debug', 'Sent to peer ' + k);
         }
-    }
-    
     // Store the msgId in the sentCache for anti-looping
     if (self.sentCache.length > self.maxCache) self.sentCache.pop();
     self.sentCache.unshift(msgId);
 }
 
+Hook.prototype.onHookInfo = function(data){
+    var self = this;
+    if (!self.peers[data.name]) {
+        self.peers[data.name] = {
+            name: data.name,
+            proxy: new EventEmitter({
+                delimiter: '::',
+                wildcard: true,
+                maxListeners: 30,
+            })
+        };
+        self.peers[data.name].proxy.getEventTypes = function(){
+            return self.prototype.getEventTypes.call(self.peers[data.name].proxy);
+        }
+    }
+    self.peers[data.name].port = data.port;
+    self.peers[data.name].directPort = data.directPort;
+    self.peers[data.name].host = data.host;
+    self.peers[data.name].name = data.name;
+    self.peers[data.name].lastHeard = Date.now();
+    // Hard reset of EventEmitter2 .listenerTree object
+    // Need to find a better way to do this, maybe exchanging
+    // the trees and diff'ing them or something like that.
+    self.peers[data.name].proxy.listenerTree = {};
+    // To-Do: the listener function is always the same!
+    // Find a way to circumvent duplication
+    for (var i in data.types) {
+        self.peers[data.name].proxy.on(data.types[i], function(evdata){
+            var socket = new nssocket.NsSocket();
+            socket.on('error', function(){socket.end();});
+            socket.on('close', function(){/* Forget about it */});
+            socket.data('event::listening', function(){
+                socket.send('event::push', {
+                    type: data.types[i],
+                    data: evdata,
+                    name: self.name
+                });
+                socket.end();
+                self.log('debug', 'Message sent');
+            });
+            self.log('debug', 'Sending direct message to peer ' + data.name);
+            try {
+                socket.connect(self.peers[data.name].directPort, self.peers[data.name].host);
+            } catch (err) {
+                self.log('warn', 'Could not send messsage to peer ' + data.name);
+            }
+        });
+    }
+    self.log('log', 'Info for peer ' + data.name + ' updated');
+}
+
 // Here we set up connections whether they have been initiated by ourselves
 // or another peer - from now on, it's P2P!
 Hook.prototype.onConnectedPeer = function(peerName) {
-
     var self = this;
-    
-    // Peer's data via MDNS
-    var peer = self.peers[peerName];
-    
-    // Some socket precautions
-    peer.socket.on('error', function(err){
-        self.log('debug', 'Socket error (' + peer.name + ')');
-        peer.socket.end();
-    });
-    peer.socket.on('close', function(){
-        delete self.peers[peer.name]['socket'];    
-    });
-    
-    // Flooding mechanism: if we receive a message, we process it locally
-    // and forward it to other connected peers so that everybody gets it
-    peer.socket.data('message::forward', function(data){
-        if (self.sentCache.indexOf(data.msgId) === -1) {
-            // No trace of the msgId in self.sentCache, we can proceed
-            
-            self.log('debug', 'Message received from ' + peer.name);
-            
-            // Local emission (we emit a p2p -namespaced event)
-            EventEmitter.prototype.emit.call(self, 'p2p' + '::' 
-              + data.type, data.data);
-            
-            // Forward to everybody
-            for (var k in self.peers)
-                if (self.peers[k].name != peer.name && self.peers[k].socket 
-                  && self.peers[k].socket.connected) {
-                    self.peers[k].socket.send('message::forward', data);
-                    self.log('debug', 'Forwarded to peer ' + k);
-                }
-                
-            // As usual, some anti-loop precautions
-            if (self.sentCache.length > self.maxCache) self.sentCache.pop();
-            self.sentCache.unshift(data.msgId);
-            
-        } else {
-            // Loop detected, do nothing
-        }
-    });
-    
-    // AAAnd we're done!
-    self.log('debug', 'Connection established  with peer ' + peer.name);   
+    if (self.sockets[peerName]) {
+        var socket = self.sockets[peerName];
+        socket.on('error', function(err){
+            self.log('debug', 'Socket error (' + peerName + ')');
+            socket.end();
+        });
+        socket.on('close', function(){
+            delete self.sockets[peerName]['socket'];    
+        });
+        // Flooding mechanism: if we receive a message, we process it locally
+        // and forward it to other connected peers so that everybody gets it
+        socket.data('message::forward', function(data){
+            if (self.sentCache.indexOf(data.msgId) === -1) {
+                // No trace of the msgId in self.sentCache, we can proceed
+                self.log('debug', 'Message received from ' + peerName);
+                // Local emission
+                EventEmitter.prototype.emit.call(self, data.type, data.data);
+                // Flooding
+                for (var k in self.sockets)
+                    if (k != peerName && self.sockets[k].connected) {
+                        self.sockets[k].send('message::forward', data);
+                        self.log('debug', 'Forwarded to peer ' + k);
+                    }
+                // As usual, some anti-loop precautions
+                if (self.sentCache.length > self.maxCache) self.sentCache.pop();
+                self.sentCache.unshift(data.msgId);
+            } else {
+                // Loop detected, do nothing
+            }
+        });
+        self.log('log', 'Connection established  with peer ' + peerName);
+    }   
 }
 
 
 // Stupid logging 101
-var logLevels = ['debug', 'debug', 'warn', 'err'];
+var logLevels = ['debug', 'log', 'warn', 'err'];
 Hook.prototype.log = function(level, message) {
     if (!message) 
-        return this.log('debug', level);
+        return this.log('log', level);
     if (logLevels.indexOf(level) >= logLevels.indexOf(this.logLevel) || this.logLevel == 'all')
         console.log(Date.now() 
           + ' | ' + this.name + ' - ' + level.toUpperCase() + ' - ' + message);
@@ -507,20 +403,15 @@ Hook.prototype.log = function(level, message) {
 // 
 // Some useful req/res emulation from an old project.
 
-// We hereby declare to the world that we, indeed, respond to
-// a certain type of requests (as in app.get())
 Hook.prototype.respond = function(type, handler) {
  	var self = this;
 	var sender = type.split('::')[0];
 	var evtype = type.split('::').slice(1).join('::');
-	var eventToSubTo = sender + '::rrh_request::*::' 
-	  + self.name + '::' + evtype;
+	var eventToSubTo = sender + '::rrh_request::*::' + self.name + '::' + evtype;
 	self.on(eventToSubTo, function(requestData){
-		var eventToEmit = 'rrh_response::' 
-		  + self.event.split('::')[2];
+		var eventToEmit = 'rrh_response::' + self.event.split('::')[2];
 		var realEvent = this.event;
-		var fakeEvent = this.event.split('::')[0] + '::' 
-		  + this.event.split('::').slice(4).join('::');
+		var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(4).join('::');
 		this.event = fakeEvent;
 		handler.call(this, requestData, function(responseEvnt, responseData){
 			self.emit(eventToEmit + '::' + responseEvnt, responseData);
@@ -535,15 +426,13 @@ Hook.prototype.request = function(type, data, eachResponse, timeoutMillis, timeo
 	var target = type.split('::')[0];
 	var evtype = type.split('::').slice(1).join('::');
 	var requestId = self.name + new String(Date.now()) + ((Math.random()*1000)|0);
-	var eventToEmit = 'rrh_request::' + requestId + '::' 
-	  + target + '::' + evtype;
+	var eventToEmit = 'rrh_request::' + requestId + '::' + target + '::' + evtype;
 	var eventToSubTo = target + '::rrh_response::' + requestId + '::**';
 	var timeout;
 	self.on(eventToSubTo, function(data){
 		if (typeof(eachResponse) == 'function') {
 			var realEvent = this.event;
-			var fakeEvent = this.event.split('::')[0] + '::' 
-			  + this.event.split('::').slice(3).join('::');
+			var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(3).join('::');
 			this.event = fakeEvent;
 			eachResponse.call(this, data);
 			this.event = realEvent;
@@ -565,12 +454,6 @@ Hook.prototype.stopResponding = function(type){
 	var self = this;
 	var sender = type.split('::')[0];
 	var evtype = type.split('::').slice(1).join('::');
-	var eventToUnsubFrom = sender + '::rrh_request::*::' 
-	  + self.name + '::' + evtype;
+	var eventToUnsubFrom = sender + '::rrh_request::*::' + self.name + '::' + evtype;
 	self.removeAllListeners(eventToUnsubFrom);
 };
-
-// Node-style creator function
-var createHook = module.exports.createHook = function(options){
-    return new Hook(options);
-}
