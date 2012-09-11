@@ -11,7 +11,7 @@ var generateID = function(){
 }  
 
 // Main function
-var Hook = function(options) {
+var Hook = module.exports.Hook = function(options) {
     var self = this;
     // We call the superconstructor on ourselves
     EventEmitter.call(self, {
@@ -111,11 +111,6 @@ var Hook = function(options) {
 // Inheritance stuff
 Hook.prototype = Object.create(EventEmitter.prototype);
 Hook.prototype.constructor = EventEmitter;
-
-// Node-style creator function
-var createHook = module.exports.createHook = function(options){
-    return new Hook(options);
-}
 
 // Returns array of connected sockets
 Hook.prototype.connectedPeers = function(){

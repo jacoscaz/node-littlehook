@@ -49,8 +49,8 @@ And the actual package
 Usage & API
 -----------
 
-    var 3phook = require('3p-hook'); 
-    var hook = 3phook.createHook({
+    var Hook = require('3p-hook').Hook; 
+    var hook = new Hook({
     	name: 'someHook'             // The hook's name
     });
 
