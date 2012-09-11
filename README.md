@@ -49,8 +49,8 @@ A package for NPM is in the works but not ready yet. Clone this repo:
 Usage
 -----
 
-    var 3ghook = require('path/to/the/module/hook.js'); 
-    var hook = 3ghook.createHook({
+    var 3phook = require('path/to/the/module/hook.js'); 
+    var hook = 3phook.createHook({
     	name: 'someHook'             // The hook's name
     });
     hook.start();
