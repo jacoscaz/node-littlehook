@@ -25,8 +25,8 @@ var Hook = module.exports.Hook = function(options) {
     self.directPort = options['directPort'] || self.port + 10;
     self.maxCache = options['maxCache'] || 20;
     self.maxPeers = options['maxPeers'] || 3;
-    self.connectionMonitorIntervalMillis = options['connectionMonitorInterval'] * 1000 || 5000; // Seconds!
-    self.propagationIntervalMillis = options['propagationInterval'] * 1000 || 10000; // Seconds!
+    self.connectionMonitorIntervalMillis = options['connectionMonitorInterval'] * 1000 || 10000; // Seconds!
+    self.propagationIntervalMillis = options['propagationInterval'] * 1000 || 30000; // Seconds!
     self.lastHeardMillis = options['lastHeardTimeout'] * 1000 || 60000; // Seconds!
     self.logLevel = options['logLevel'] || 'log';
     self.mdnsPeers = {};
