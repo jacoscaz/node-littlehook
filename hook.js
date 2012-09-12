@@ -316,7 +316,7 @@ Hook.prototype.connect = function(port, host){
     });
     try {
         socket.connect(port, host);
-    } catch {
+    } catch (err) {
         self.log('warn', 'Could connect to ' + host + ':' + port);
     }
 }
