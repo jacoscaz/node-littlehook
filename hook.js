@@ -74,7 +74,6 @@ var Hook = module.exports.Hook = function(options) {
         }
         self.log('log', 'Info for peer ' + data.name + ' updated');
     });
-    
    
     self.on('*::p2p::hook::newListener', function(type){
         var peerName = this.event.split('::')[0];
@@ -181,7 +180,11 @@ Hook.prototype.start = function(){
     // We advertise ourselves on MDNS
     self.advertisement = mdns.createAdvertisement(mdns.tcp('hook'), 
       self.port, {name: self.name});
-    self.advertisement.start();
+    try {
+        self.advertisement.start();
+    } catch (err) {
+        self.log('err', 'MDNS: ' + err);
+    }
     
     // MDNS Browser         
     self.browser = mdns.createBrowser(mdns.tcp('hook'));
@@ -311,7 +314,11 @@ Hook.prototype.connect = function(port, host){
         self.sockets[peerName] = socket;
         self.onConnectedPeer(peerName);
     });
-    socket.connect(port, host);
+    try {
+        socket.connect(port, host);
+    } catch {
+        self.log('warn', 'Could connect to ' + host + ':' + port);
+    }
 }
 
 Hook.prototype.propagate = function(type, data) {
@@ -406,60 +413,58 @@ Hook.prototype.log = function(level, message) {
 // ==================================================================
 // Request/response emulation on store/sub p2p! What is this madness?
 // ==================================================================
-// 
-// Some useful req/res emulation from an old project.
 
 Hook.prototype.respond = function(type, handler) {
- 	var self = this;
-	var sender = type.split('::')[0];
-	var evtype = type.split('::').slice(1).join('::');
-	var eventToSubTo = sender + '::rrh_request::*::' + self.name + '::' + evtype;
-	self.on(eventToSubTo, function(requestData){
-		var eventToEmit = 'rrh_response::' + self.event.split('::')[2];
-		var realEvent = this.event;
-		var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(4).join('::');
-		this.event = fakeEvent;
-		handler.call(this, requestData, function(responseEvnt, responseData){
-			self.emit(eventToEmit + '::' + responseEvnt, responseData);
-		});
-		this.event = realEvent;
-	});
+    var self = this;
+    var sender = type.split('::')[0];
+    var evtype = type.split('::').slice(1).join('::');
+    var eventToSubTo = sender + '::rrh_request::*::' + self.name + '::' + evtype;
+    self.on(eventToSubTo, function(requestData){
+        var eventToEmit = 'rrh_response::' + self.event.split('::')[2];
+        var realEvent = this.event;
+        var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(4).join('::');
+        this.event = fakeEvent;
+        handler.call(this, requestData, function(responseEvnt, responseData){
+            self.emit(eventToEmit + '::' + responseEvnt, responseData);
+        });
+        this.event = realEvent;
+    });
 }
 
 // We issue a request - a cleverly-cloaked event, Mr. Holmes
 Hook.prototype.request = function(type, data, eachResponse, timeoutMillis, timeoutFunc) {
-	var self = this;
-	var target = type.split('::')[0];
-	var evtype = type.split('::').slice(1).join('::');
-	var requestId = self.name + new String(Date.now()) + ((Math.random()*1000)|0);
-	var eventToEmit = 'rrh_request::' + requestId + '::' + target + '::' + evtype;
-	var eventToSubTo = target + '::rrh_response::' + requestId + '::**';
-	var timeout;
-	self.on(eventToSubTo, function(data){
-		if (typeof(eachResponse) == 'function') {
-			var realEvent = this.event;
-			var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(3).join('::');
-			this.event = fakeEvent;
-			eachResponse.call(this, data);
-			this.event = realEvent;
-		}
-	});
-	timeout = setTimeout(
-		function(){
-			self.removeAllListeners(eventToSubTo);
-			if (typeof(timeoutFunc) == 'function')
-				timeoutFunc();
-		}, 
-		timeoutMillis || 2000
-	);
-	self.emit(eventToEmit, data);
+    var self = this;
+    var target = type.split('::')[0];
+    var evtype = type.split('::').slice(1).join('::');
+    var requestId = self.name + new String(Date.now()) + ((Math.random()*1000)|0);
+    var eventToEmit = 'rrh_request::' + requestId + '::' + target + '::' + evtype;
+    var eventToSubTo = target + '::rrh_response::' + requestId + '::**';
+    var timeout;
+    self.on(eventToSubTo, function(data){
+        if (typeof(eachResponse) == 'function') {
+            var realEvent = this.event;
+            var fakeEvent = this.event.split('::')[0] + '::' + this.event.split('::').slice(3).join('::');
+            this.event = fakeEvent;
+            eachResponse.call(this, data);
+            this.event = realEvent;
+        }
+    });
+    timeout = setTimeout(
+        function(){
+            self.removeAllListeners(eventToSubTo);
+            if (typeof(timeoutFunc) == 'function')
+	            timeoutFunc();
+        }, 
+        timeoutMillis || 2000
+    );
+    self.emit(eventToEmit, data);
 }
 
 // We won't reply anymore to your silly requests, young hook.
 Hook.prototype.stopResponding = function(type){
-	var self = this;
-	var sender = type.split('::')[0];
-	var evtype = type.split('::').slice(1).join('::');
-	var eventToUnsubFrom = sender + '::rrh_request::*::' + self.name + '::' + evtype;
-	self.removeAllListeners(eventToUnsubFrom);
+    var self = this;
+    var sender = type.split('::')[0];
+    var evtype = type.split('::').slice(1).join('::');
+    var eventToUnsubFrom = sender + '::rrh_request::*::' + self.name + '::' + evtype;
+    self.removeAllListeners(eventToUnsubFrom);
 };
