@@ -81,8 +81,8 @@ var Hook = module.exports.Hook = function(options) {
           && self.peers[peerName].proxy.getEventTypes().indexOf(type) == -1) {
             self.peers[peerName].proxy.on(type, function(evdata){
                 var socket = new nssocket.NsSocket();
-                socket.on('error', function(){socket.end();});
-                socket.on('close', function(){/* Forget about it */});
+                socket.on('error', function(){socket.destroy();});
+                socket.on('close', function(){socket.destroy();});
                 socket.data('event::listening', function(){
                     socket.send('event::push', {
                         type: type,
@@ -161,7 +161,12 @@ Hook.prototype.start = function(){
         socket.send('ident::request', {name: self.name});
         self.log('debug', 'Incoming connection');
     });
-    self.server.listen(self.port);
+    try {
+        self.server.listen(self.port);
+    } catch (err) {
+        self.log('err', 'Could not start the p2p server! Maybe the port is already in use?');
+        self.log('err', err);
+    }
     
     // Server (listening) socket for direct connections
     self.directServer = nssocket.createServer(function(socket){
@@ -175,7 +180,12 @@ Hook.prototype.start = function(){
         socket.send('event::listening');
         self.log('debug', 'Direct connection');
     });
-    self.directServer.listen(self.directPort);
+    try {
+        self.directServer.listen(self.directPort);
+    } catch (err) {
+        self.log('err', 'Could not start the direct messaging server! Maybe the port is already in use?');
+        self.log('err', err);
+    }
     
     // We advertise ourselves on MDNS
     self.advertisement = mdns.createAdvertisement(mdns.tcp('hook'), 
@@ -294,8 +304,10 @@ Hook.prototype.connect = function(port, host){
     var self = this;
     self.log('debug', 'Connection attempt with peer ' + peerName);
     var socket = new nssocket.NsSocket();
-    var timeout = setTimeout(function(){socket.end();}, 3000);
+    var timeout = setTimeout(function(){socket.destroy();}, 3000);
     var peerName;
+    socket.on('error', function(err){socket.destroy();});
+    socket.on('close', function(err){socket.destroy();});
     socket.data('ident::request', function(data){
         peerName = data.name;
         if (!self.sockets[peerName]) {
@@ -366,13 +378,6 @@ Hook.prototype.onConnectedPeer = function(peerName) {
     var self = this;
     if (self.sockets[peerName]) {
         var socket = self.sockets[peerName];
-        socket.on('error', function(err){
-            self.log('debug', 'Socket error (' + peerName + ')');
-            socket.end();
-        });
-        socket.on('close', function(){
-            delete self.sockets[peerName]['socket'];    
-        });
         // Flooding mechanism: if we receive a message, we process it locally
         // and forward it to other connected peers so that everybody gets it
         socket.data('message::forward', function(data){
