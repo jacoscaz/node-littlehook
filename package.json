@@ -7,7 +7,7 @@
     "keywords": ["auto", "discovery", "decentralized", "p2p", "eventemitter", "mdns"],
     "repository" : {
         "type": "git",
-        "url": "https://github.com/jacoscaz/3p-hook"
+        "url": "https://github.com/jacoscaz/3P"
     },
     "dependencies": {
     	"eventemitter2": ">= 0.4.x",
