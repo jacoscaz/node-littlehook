@@ -1,12 +1,12 @@
-3P
-==
+littlehook
+==========
 
-3P is a "Pure P2P", lan-wide, distributed EventEmitter2 implementation supporting complete decentralization, auto-discovery  &amp; request-response emulation, powered by MDNS.
+littlehook is a lan-wide, distributed EventEmitter2 implementation supporting complete decentralization, auto-discovery  &amp; request-response emulation, powered by MDNS.
 
 What does it do
 ---------------
 
-Inspired by [Hook.io](https://github.com/hookio/hook.io) and [Tinyhook](https://github.com/sergeyksv/tinyhook), 3P provides lightweight, namespaced and fully-decentralized eventing in a "[pure p2p](http://en.wikipedia.org/wiki/Peer-to-peer#Unstructured_systems)" fashion. 3P is a distributed implementation of [EventEmitter2](https://github.com/hij1nx/EventEmitter2).
+Inspired by [Hook.io](https://github.com/hookio/hook.io) and [Tinyhook](https://github.com/sergeyksv/tinyhook), littlehook provides lightweight, namespaced and fully-decentralized eventing in a "[pure p2p](http://en.wikipedia.org/wiki/Peer-to-peer#Unstructured_systems)" fashion. Littlehook is a distributed implementation of [EventEmitter2](https://github.com/hij1nx/EventEmitter2).
 
 Each hook uses [MDNS](https://github.com/agnat/node_mdns) in a store-sub fashion to discover its peers, monitor their subscriptions and publish his own subscriptions. [NsSocket](https://github.com/nodejitsu/nssocket) and [EventEmitter2](https://github.com/hij1nx/EventEmitter2) are used to push events to the appropriate listener hooks. Each hook is free to fail without compromising the rest of its peers or the network (no meshes, no trees). Request-response emulation is provided.
 
@@ -28,7 +28,7 @@ To-Do
 Usage & API
 -----------
 
-    var Hook = require('3P'); 
+    var Hook = require('littlehook'); 
     var hook = new Hook({
     	name: 'someHook',
         port: 9999
@@ -45,7 +45,7 @@ Events are namespaced as in [Tinyhook](https://github.com/sergeyksv/tinyhook) an
 In addition, each hook provides the following request-response methods:
 
     // Type-based response mechanism
-    hook.respond('sendHook::request::type', handler(reqData, reply){
+    hook.respond('senderHook::request::type', handler(reqData, reply){
     	var requestEvent = this.event;
         reply('response::type', 'response data');
     });

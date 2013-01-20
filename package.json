@@ -1,5 +1,5 @@
 {
-    "name": "3P",
+    "name": "littlehook",
     "version": "0.0.1",
     "description": "A lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
     "main": "./index.js",
@@ -7,7 +7,7 @@
     "keywords": ["auto", "discovery", "decentralized", "p2p", "eventemitter", "mdns"],
     "repository" : {
         "type": "git",
-        "url": "https://github.com/jacoscaz/3P"
+        "url": "https://github.com/jacoscaz/littlehook"
     },
     "dependencies": {
     	"eventemitter2": ">= 0.4.x",
