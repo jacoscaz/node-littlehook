@@ -3,7 +3,7 @@
     "version": "0.0.1",
     "description": "A lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
     "main": "./index.js",
-    "author": "Jacopo Scazzosi <jacoposcazzosi@gmail.com>",
+    "author": "Jacopo Scazzosi <github@jacoscaz.com>",
     "keywords": ["auto", "discovery", "decentralized", "p2p", "eventemitter", "mdns"],
     "repository" : {
         "type": "git",
