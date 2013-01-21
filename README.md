@@ -35,12 +35,22 @@ Usage & API
     });
     hook.start();
 
-Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api).
+Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api). 
 
 Events are namespaced as in [Tinyhook](https://github.com/sergeyksv/tinyhook) and [Hook.io](https://github.com/hookio/hook.io).
 
     var hook = new Hook({name: 'johnny', port: 9999});
-    hook.emit('hello'); // Event emitted: johnny::hello
+    hook.emit('hello'); // Event emitted: ['johnny', 'hello']
+
+The delimiter used is always '::' (see EventEmitter2's specs):
+
+    'hookName::event::type'   <->   ['hookName', 'event', 'type'] 
+
+Each hook emits the following events:
+
+    ['hookName', 'up']     -> Hook 'hookName' came up
+    ['hookName', 'down']   -> Hook 'hookName' went down
+    ['hookName', 'update'] -> Hook 'hookName' updated its subscriptions
 
 In addition, each hook provides the following request-response methods:
 
