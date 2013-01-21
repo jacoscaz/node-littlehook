@@ -29,11 +29,33 @@ Usage & API
 -----------
 
     var Hook = require('littlehook'); 
-    var hook = new Hook({
-    	name: 'someHook',
-        port: 9999
+    
+    var a = new Hook({ name: 'a', port: 9999 });
+    var b = new Hook({ name: 'b', port: 9998 });
+    
+    // Matches events of type 'event::type' sent by 
+    // any hook in the same MDNS area
+    a.on(['*', 'event', 'type'], function(data) {
+        console.log('data: ' + data);
+        console.log('sender: ' + this.event[0]);
     });
-    hook.start();
+    
+    // This does the same as the above w/ events
+    // specified as strings instead of arrays
+    a.on('*::event::type', function(data) {
+        console.log('data: ' + data);
+        console.log('sender: ' + this.event.split('::')[0]);
+    });
+    
+    // When hook 'a' comes online, emits event of
+    // type 'event::type' - the resulting event will
+    // be namespaced as 'b::event::type'
+    b.on(['a', 'up'], function() {
+        b.emit(['event', 'type'], { some: 'data' });
+    });
+    
+    a.start();
+    b.start();
 
 Each hook is an EventEmitter2 instance, see the [relative API specs](https://github.com/hij1nx/EventEmitter2#api). 
 
