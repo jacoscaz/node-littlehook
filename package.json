@@ -1,20 +1,46 @@
 {
-    "name": "littlehook",
-    "version": "0.0.4",
-    "description": "A lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
-    "main": "./index.js",
-    "author": "Jacopo Scazzosi <me@jacoscaz.com>",
-    "keywords": ["auto", "discovery", "decentralized", "p2p", "eventemitter", "mdns"],
-    "repository" : {
-        "type": "git",
-        "url": "https://github.com/jacoscaz/littlehook"
-    },
-    "dependencies": {
-    	"eventemitter2": ">= 0.4.x",
-    	"nssocket"     : ">= 0.3.x",
-    	"mdns"         : ">= 0.0.7",
-        "underscore"   : ">= 1.4.0"
-    },
-    "license": "MIT",
-    "engines": {"node": ">=0.6"}
+  "name": "littlehook",
+  "version": "0.0.5",
+  "description": "A lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
+  "main": "lib/hook.js",
+  "author": "Jacopo Scazzosi <me@jacoscaz.com>",
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [
+    "auto",
+    "discovery",
+    "decentralized",
+    "p2p",
+    "eventemitter",
+    "mdns",
+    "tinyhook",
+    "hook.io"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:jacoscaz/node-littlehook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jacoscaz/node-littlehook/issues"
+  },
+  "homepage": "https://github.com/jacoscaz/node-littlehook",
+  "scripts": {
+    "test": "./node_modules/mocha/bin/mocha"
+  },
+  "dependencies": {
+    "debug": "^2.1.1",
+    "eventemitter2": "^0.4.14",
+    "mdns": "^2.2.2",
+    "nssocket": "^0.5.3",
+    "underscore": "^1.7.0"
+  },
+  "devDependencies": {
+    "mocha": "^2.1.0",
+    "should": "^4.6.1"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=0.10"
+  }
 }
