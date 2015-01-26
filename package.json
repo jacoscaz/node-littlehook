@@ -1,6 +1,6 @@
 {
     "name": "littlehook",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "A lan-wide EventEmitter2 implementation supporting complete decentralization, auto-discovery and request-response emulation.",
     "main": "./index.js",
     "author": "Jacopo Scazzosi <me@jacoscaz.com>",
